@@ -1,9 +1,12 @@
+import 'dart:developer';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'dart:typed_data';
+import 'package:image/image.dart' as img;
+import 'package:image_painter/image_painter.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
-/// The main function initializes the Flutter application
-/// and runs the MyApp widget.
 void main() {
   runApp(const MyApp());
 }
@@ -15,7 +18,12 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       theme: ThemeData(
-        primaryColor: Colors.white,
+        primaryColor: Colors.teal,
+        canvasColor: Colors.grey[200],
+        textTheme: const TextTheme(
+          bodyMedium: TextStyle(color: Colors.black),
+          headlineSmall: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+        ),
       ),
       home: const HomeScreen(),
     );
@@ -28,212 +36,226 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: const CustomAppBar(),
-      body: Row(
-        children: const [
-          Expanded(child: PersonalInfoForm()),
-          Expanded(child: FileUploader()),
-        ],
+      appBar: AppBar(
+        title: const Text("Home Page"),
+        backgroundColor: Colors.teal,
       ),
+      body: const ROISelectionScreen(),
     );
   }
 }
 
-class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
-  const CustomAppBar({super.key});
+class ROISelectionScreen extends StatefulWidget {
+  const ROISelectionScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return AppBar(
-      backgroundColor: Colors.blueGrey,
-      centerTitle: true,
-      title: const Text(
-        "Home Page",
-        textAlign: TextAlign.center,
-        style: TextStyle(
-            fontSize: 30, color: Colors.black, fontWeight: FontWeight.bold),
-      ),
-    );
-  }
-
-  @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+  ROISelectionScreenState createState() => ROISelectionScreenState();
 }
 
-class PersonalInfoForm extends StatefulWidget {
-  const PersonalInfoForm({super.key});
+class ROISelectionScreenState extends State<ROISelectionScreen> {
+  Uint8List? _imageBytes;
+   ImagePainterController _controller = ImagePainterController();
+  // final ImagePainterController _controller = ImagePainterController(
+  //   fill: false,
+  //   color: Colors.black,
+  //   mode: PaintMode.rect,
+  //   strokeWidth: 2.0,
+  // );
 
-  @override
-  PersonalInfoFormState createState() => PersonalInfoFormState();
-}
-
-class PersonalInfoFormState extends State<PersonalInfoForm> {
   final _formKey = GlobalKey<FormState>();
-  final FormFieldControllers _controllers = FormFieldControllers();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _ageController = TextEditingController();
+  final TextEditingController _genderController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      color: Colors.blueGrey[200],
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Align(
-            alignment: Alignment.topCenter,
-            child: Text(
-              "Personal Information",
-              style: TextStyle(
-                  fontSize: 25,
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                ..._controllers.buildFormFields(),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: _submitForm,
-                  child: const Text('Submit'),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+  Future<void> _pickFile() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
     );
-  }
 
-  void _submitForm() {
-    if (_formKey.currentState!.validate()) {
+    if (result != null) {
+      if (kIsWeb) {
+        if (result.files.single.bytes != null) {
+          // log("File selected (Web): ${result.files.single.bytes!.length} bytes");
+          setState(() {
+            _imageBytes = result.files.single.bytes;
+            _controller.clear();
+            _controller = ImagePainterController(
+              fill: false,
+              color: Colors.black,
+              mode: PaintMode.rect,
+              strokeWidth: 2.0,
+            );
+          });
+        }
+      } else {
+        if (result.files.single.path != null) {
+          File file = File(result.files.single.path!);
+          _imageBytes = await file.readAsBytes();
+          setState(() {
+            _controller.clear();
+            _controller = ImagePainterController(
+              fill: false,
+              color: Colors.black,
+              mode: PaintMode.rect,
+              strokeWidth: 2.0,
+            );
+          });
+        }
+      }
+    } else {
+      log("File selection canceled.");
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Form Submitted Successfully')),
+        const SnackBar(content: Text('No image selected or invalid file')),
       );
     }
   }
-}
 
-class CustomTextFormField extends StatelessWidget {
-  final TextEditingController controller;
-  final String label;
+//   Future<void> _pickFile() async {
+//   FilePickerResult? result = await FilePicker.platform.pickFiles(
+//     type: FileType.image,
+//   );
 
-  const CustomTextFormField(
-      {super.key, required this.controller, required this.label});
+//   if (result != null) {
+//     if (mounted) {
+//       setState(() {
+//         _imageBytes = result.files.single.bytes;
+//         _controller.dispose();  // Dispose of the old controller safely
+//         _controller = ImagePainterController(
+//           fill: false,
+//           color: Colors.black,
+//           mode: PaintMode.rect,
+//           strokeWidth: 2.0,
+//         );
+//       });
+//       }
+//     } else {
+//     log("File selection canceled.");
+//     if (mounted) {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         const SnackBar(content: Text('No image selected or invalid file')),
+//       );
+//     }
+//   }
+// }
 
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextFormField(
-              controller: controller,
-              decoration: InputDecoration(
-                  labelText: label, border: const OutlineInputBorder()),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter your $label';
-                }
-                return null;
-              },
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.crop),
-            onPressed: () {
-              print('Selecting ROI for $label');
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
 
-class FormFieldControllers {
-  final TextEditingController nameController = TextEditingController();
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController phoneController = TextEditingController();
-  final TextEditingController addressController = TextEditingController();
-  final TextEditingController ageController = TextEditingController();
 
-  List<Widget> buildFormFields() {
-    return [
-      CustomTextFormField(controller: nameController, label: 'Name'),
-      CustomTextFormField(controller: emailController, label: 'Email'),
-      CustomTextFormField(controller: ageController, label: 'Age'),
-      CustomTextFormField(controller: phoneController, label: 'Phone number'),
-      CustomTextFormField(controller: addressController, label: 'Address'),
-    ];
-  }
-}
+  Future<void> _cropImage() async {
+    if (_imageBytes == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please upload an image')),
+      );
+      return;
+    }
+    
+    final img.Image? decodedImage = img.decodeImage(_imageBytes!);
 
-class FileUploader extends StatefulWidget {
-  final double width;
-  final double height;
+    if (decodedImage != null) {
+      final img.Image croppedImage = img.copyCrop(decodedImage, 0, 0, 200, 200);
+      final Uint8List croppedBytes = Uint8List.fromList(img.encodePng(croppedImage));
 
-  const FileUploader({Key? key, this.width = 100, this.height = 500})
-      : super(key: key);
-
-  @override
-  FileUploaderState createState() => FileUploaderState();
-}
-
-class FileUploaderState extends State<FileUploader> {
-  Uint8List? _imageBytes;
-
-  Future<void> _pickFile() async {
-    FilePickerResult? result =
-        await FilePicker.platform.pickFiles(type: FileType.image);
-
-    if (result != null) {
-      setState(() {
-        _imageBytes = result.files.single.bytes;
-      });
+      log("Cropped Image Size: ${croppedBytes.length} bytes");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Cropped Image Size: ${croppedBytes.length} bytes')),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: _pickFile,
-      child: Container(
-        width: widget.width,
-        height: widget.height,
-        decoration: BoxDecoration(
-          color: Colors.grey[300],
-          border: Border.all(color: Colors.grey, width: 2),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: _imageBytes == null
-            ? Center(
-                child: Text(
-                  'Tap to upload\nimage',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.blueGrey[500]),
-                ),
-              )
-            : InteractiveViewer(
-                boundaryMargin: EdgeInsets.all(20.0),
-                minScale: 1.0,
-                maxScale: 5.0,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.memory(
-                    _imageBytes!,
-                    width: widget.width,
-                    height: widget.height,
-                    fit: BoxFit.contain,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 1,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Form(
+              key: _formKey,
+              child: ListView(
+                children: [
+                  _buildTextField(_nameController, "Name"),
+                  _buildTextField(_emailController, "Email"),
+                  _buildTextField(_ageController, "Age", isNumeric: true),
+                  _buildTextField(_genderController, "Gender"),
+                  _buildTextField(_addressController, "Address"),
+                  _buildTextField(_phoneController, "Phone Number", isNumeric: true),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: () {
+                      if (_formKey.currentState!.validate()) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Form Submitted!')),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+                    child: const Text("Submit"),
                   ),
-                ),
+                ],
               ),
-      ),
+            ),
+          ),
+        ),
+        const VerticalDivider(width: 1, color: Colors.grey),
+        Expanded(
+          flex: 2,
+          child: Column(
+            children: [
+              _imageBytes == null
+                  ? Center(
+                      child: ElevatedButton(
+                        onPressed: _pickFile,
+                        child: const Text("Upload Image"),
+                      ),
+                    )
+                  : Expanded(
+                      child: Stack(
+                        children: [
+                          ImagePainter.memory(
+                            _imageBytes!,
+                            controller: _controller,
+                            scalable: true,
+                          ),
+                          Positioned(
+                            top: 50,
+                            right: 10,
+                            child: IconButton(
+                              icon: const Icon(Icons.cancel, color: Colors.black, size: 30),
+                              onPressed: () {
+                                setState(() {
+                                  _imageBytes = null;
+                                  _controller.clear();
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+              const SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: _cropImage,
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+                child: const Text("Crop Image"),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTextField(TextEditingController controller, String label, {bool isNumeric = false}) {
+    return TextFormField(
+      controller: controller,
+      decoration: InputDecoration(labelText: label),
+      keyboardType: isNumeric ? TextInputType.number : TextInputType.text,
+      validator: (value) => value!.isEmpty ? "Please enter your $label" : null,
     );
   }
 }
