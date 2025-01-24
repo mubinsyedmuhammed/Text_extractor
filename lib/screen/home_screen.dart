@@ -4,7 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_painter/image_painter.dart';
-import 'package:image/image.dart' as img;  // Add image package for image manipulation
+import 'package:image/image.dart' as img; // Add image package for image manipulation
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -45,8 +45,6 @@ class ROISelectionScreenState extends State<ROISelectionScreen> {
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
 
-  // Removed the conflicting local 'img' variable
-
   Future<void> _pickFile() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.image,
@@ -83,13 +81,14 @@ class ROISelectionScreenState extends State<ROISelectionScreen> {
       }
     } else {
       log("File selection canceled.");
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No image selected or invalid file')),
       );
     }
   }
 
-  Future<void> _cropImage() async {
+  Future<void> _extractTextFromCroppedImage(String field) async {
     if (_imageBytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please upload an image')),
@@ -100,11 +99,11 @@ class ROISelectionScreenState extends State<ROISelectionScreen> {
     final img.Image? decodedImage = img.decodeImage(_imageBytes!);
 
     if (decodedImage != null) {
-      // Get the selected ROI coordinates (can be done by extracting coordinates from the controller)
+      // Get the selected ROI coordinates
       final rect = _controller.paintArea;
 
       if (rect != null) {
-        final croppedImage = img.copyCrop(
+        img.copyCrop(
           decodedImage,
           x: rect.left.toInt(),
           y: rect.top.toInt(),
@@ -112,14 +111,47 @@ class ROISelectionScreenState extends State<ROISelectionScreen> {
           height: rect.height.toInt(),
         );
 
-        final Uint8List croppedBytes = Uint8List.fromList(img.encodePng(croppedImage));
 
-        log("Cropped Image Size: ${croppedBytes.length} bytes");
+        // Here, you would send the cropped image to your backend for text extraction
+        // This is just a placeholder for the backend call
+        // Example: String extractedText = await backendService.extractText(croppedBytes);
+
+        // For now, we'll mock a response based on the field
+        String extractedText = _mockTextExtraction(field);
+
+        // Update the corresponding TextField with the extracted text
+        switch (field) {
+          case 'Name':
+            _nameController.text = extractedText;
+            break;
+          case 'Email':
+            _emailController.text = extractedText;
+            break;
+          case 'Age':
+            _ageController.text = extractedText;
+            break;
+          case 'Gender':
+            _genderController.text = extractedText;
+            break;
+          case 'Address':
+            _addressController.text = extractedText;
+            break;
+          case 'Phone Number':
+            _phoneController.text = extractedText;
+            break;
+        }
+
+        log("Extracted Text: $extractedText");
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Cropped Image Size: ${croppedBytes.length} bytes')),
+          SnackBar(content: Text('Extracted Text: $extractedText')),
         );
       }
     }
+  }
+
+  String _mockTextExtraction(String field) {
+    // Mock extraction based on the field for now
+    return 'Sample $field';
   }
 
   @override
@@ -135,12 +167,12 @@ class ROISelectionScreenState extends State<ROISelectionScreen> {
               key: _formKey,
               child: ListView(
                 children: [
-                  _buildTextField(_nameController, "Name"),
-                  _buildTextField(_emailController, "Email"),
-                  _buildTextField(_ageController, "Age", isNumeric: true),
-                  _buildTextField(_genderController, "Gender"),
-                  _buildTextField(_addressController, "Address"),
-                  _buildTextField(_phoneController, "Phone Number", isNumeric: true),
+                  _buildTextField(_nameController, "Name", "Name"),
+                  _buildTextField(_emailController, "Email", "Email"),
+                  _buildTextField(_ageController, "Age", "Age", isNumeric: true),
+                  _buildTextField(_genderController, "Gender", "Gender"),
+                  _buildTextField(_addressController, "Address", "Address"),
+                  _buildTextField(_phoneController, "Phone Number", "Phone Number", isNumeric: true),
                   const SizedBox(height: 20),
                   ElevatedButton(
                     onPressed: () {
@@ -194,12 +226,6 @@ class ROISelectionScreenState extends State<ROISelectionScreen> {
                         ],
                       ),
                     ),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _cropImage,
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-                child: const Text("Crop Image"),
-              ),
             ],
           ),
         ),
@@ -207,12 +233,24 @@ class ROISelectionScreenState extends State<ROISelectionScreen> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, {bool isNumeric = false}) {
-    return TextFormField(
-      controller: controller,
-      decoration: InputDecoration(labelText: label),
-      keyboardType: isNumeric ? TextInputType.number : TextInputType.text,
-      validator: (value) => value!.isEmpty ? "Please enter your $label" : null,
+  Widget _buildTextField(TextEditingController controller, String label, String field, {bool isNumeric = false}) {
+    return Row(
+      children: [
+        Expanded(
+          child: TextFormField(
+            controller: controller,
+            decoration: InputDecoration(labelText: label),
+            keyboardType: isNumeric ? TextInputType.number : TextInputType.text,
+            validator: (value) => value!.isEmpty ? "Please enter your $label" : null,
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.text_fields, color: Colors.teal),
+          onPressed: () {
+            _extractTextFromCroppedImage(field);
+          },
+        ),
+      ],
     );
   }
 }
