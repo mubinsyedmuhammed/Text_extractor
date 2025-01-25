@@ -1,36 +1,11 @@
-import 'dart:convert';
 import 'dart:developer';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:image/image.dart' as img; // Add image package for image manipulation
+import 'package:image/image.dart' as img;
 import 'package:image_painter/image_painter.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:http/http.dart' as http;
-
-class OCRService {
-  final String apiUrl = "http://localhost:8000/extract_text/";
-
-  Future<String> extractText(Uint8List imageBytes) async {
-    try {
-      var request = http.MultipartRequest('POST', Uri.parse(apiUrl));
-      request.files.add(
-        http.MultipartFile.fromBytes('file', imageBytes, filename: 'image.jpg'),
-      );
-
-      var response = await request.send();
-      if (response.statusCode == 200) {
-        final responseData = await response.stream.bytesToString();
-        final extractedText = json.decode(responseData)['extracted_text'];
-        return extractedText;
-      } else {
-        return 'Failed to extract text';
-      }
-    } catch (e) {
-      return 'Error: $e';
-    }
-  }
-}
+import 'package:text_extractor/services/ocr_service.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -56,12 +31,25 @@ class ROISelectionScreen extends StatefulWidget {
 
 class ROISelectionScreenState extends State<ROISelectionScreen> {
   Uint8List? _imageBytes;
-  ImagePainterController _controller = ImagePainterController(
-    fill: false,
-    color: Colors.black,
-    mode: PaintMode.rect,
-    strokeWidth: 2.0,
-  );
+  late final ImagePainterController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = ImagePainterController(
+      fill: false,
+      color: Colors.black,
+      mode: PaintMode.rect,
+      strokeWidth: 2.0,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.clear();  // Dispose of the controller when the widget is disposed
+    super.dispose();
+  }
+
 
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
@@ -76,19 +64,11 @@ class ROISelectionScreenState extends State<ROISelectionScreen> {
       type: FileType.image,
     );
 
-    if (result != null) {
-      if (result.files.single.bytes != null) {
-        setState(() {
-          _imageBytes = result.files.single.bytes;
-          _controller.clear();
-          _controller = ImagePainterController(
-            fill: false,
-            color: Colors.black,
-            mode: PaintMode.rect,
-            strokeWidth: 2.0,
-          );
-        });
-      }
+    if (result != null && result.files.single.bytes != null) {
+      setState(() {
+        _imageBytes = result.files.single.bytes;
+        _controller.clear();
+      });
     } else {
       log("File selection canceled.");
       // ignore: use_build_context_synchronously
@@ -192,6 +172,7 @@ class ROISelectionScreenState extends State<ROISelectionScreen> {
       }
 
       log("Extracted Text: $extractedText");
+
       // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Extracted Text: $extractedText')),
