@@ -1,10 +1,36 @@
+import 'dart:convert';
 import 'dart:developer';
-import 'dart:io';
-import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
-import 'package:image_painter/image_painter.dart';
 import 'package:image/image.dart' as img; // Add image package for image manipulation
+import 'package:image_painter/image_painter.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:http/http.dart' as http;
+
+class OCRService {
+  final String apiUrl = "http://localhost:8000/extract_text/";
+
+  Future<String> extractText(Uint8List imageBytes) async {
+    try {
+      var request = http.MultipartRequest('POST', Uri.parse(apiUrl));
+      request.files.add(
+        http.MultipartFile.fromBytes('file', imageBytes, filename: 'image.jpg'),
+      );
+
+      var response = await request.send();
+      if (response.statusCode == 200) {
+        final responseData = await response.stream.bytesToString();
+        final extractedText = json.decode(responseData)['extracted_text'];
+        return extractedText;
+      } else {
+        return 'Failed to extract text';
+      }
+    } catch (e) {
+      return 'Error: $e';
+    }
+  }
+}
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -13,7 +39,7 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Home Page"),
+        title: const Text("OCR and ROI Selection"),
         backgroundColor: Colors.teal,
       ),
       body: const ROISelectionScreen(),
@@ -51,33 +77,17 @@ class ROISelectionScreenState extends State<ROISelectionScreen> {
     );
 
     if (result != null) {
-      if (kIsWeb) {
-        if (result.files.single.bytes != null) {
-          setState(() {
-            _imageBytes = result.files.single.bytes;
-            _controller.clear();
-            _controller = ImagePainterController(
-              fill: false,
-              color: Colors.black,
-              mode: PaintMode.rect,
-              strokeWidth: 2.0,
-            );
-          });
-        }
-      } else {
-        if (result.files.single.path != null) {
-          File file = File(result.files.single.path!);
-          _imageBytes = await file.readAsBytes();
-          setState(() {
-            _controller.clear();
-            _controller = ImagePainterController(
-              fill: false,
-              color: Colors.black,
-              mode: PaintMode.rect,
-              strokeWidth: 2.0,
-            );
-          });
-        }
+      if (result.files.single.bytes != null) {
+        setState(() {
+          _imageBytes = result.files.single.bytes;
+          _controller.clear();
+          _controller = ImagePainterController(
+            fill: false,
+            color: Colors.black,
+            mode: PaintMode.rect,
+            strokeWidth: 2.0,
+          );
+        });
       }
     } else {
       log("File selection canceled.");
@@ -98,60 +108,101 @@ class ROISelectionScreenState extends State<ROISelectionScreen> {
 
     final img.Image? decodedImage = img.decodeImage(_imageBytes!);
 
-    if (decodedImage != null) {
-      // Get the selected ROI coordinates
-      final rect = _controller.paintArea;
-
-      if (rect != null) {
-        img.copyCrop(
-          decodedImage,
-          x: rect.left.toInt(),
-          y: rect.top.toInt(),
-          width: rect.width.toInt(),
-          height: rect.height.toInt(),
-        );
-
-
-        // Here, you would send the cropped image to your backend for text extraction
-        // This is just a placeholder for the backend call
-        // Example: String extractedText = await backendService.extractText(croppedBytes);
-
-        // For now, we'll mock a response based on the field
-        String extractedText = _mockTextExtraction(field);
-
-        // Update the corresponding TextField with the extracted text
-        switch (field) {
-          case 'Name':
-            _nameController.text = extractedText;
-            break;
-          case 'Email':
-            _emailController.text = extractedText;
-            break;
-          case 'Age':
-            _ageController.text = extractedText;
-            break;
-          case 'Gender':
-            _genderController.text = extractedText;
-            break;
-          case 'Address':
-            _addressController.text = extractedText;
-            break;
-          case 'Phone Number':
-            _phoneController.text = extractedText;
-            break;
-        }
-
-        log("Extracted Text: $extractedText");
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Extracted Text: $extractedText')),
-        );
-      }
+    if (decodedImage == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid image format')),
+      );
+      return;
     }
-  }
 
-  String _mockTextExtraction(String field) {
-    // Mock extraction based on the field for now
-    return 'Sample $field';
+    if (_controller.paintHistory.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No ROI selected. Please draw a region to crop.')),
+      );
+      return;
+    }
+
+    final paintInfo = _controller.paintHistory.last;
+
+    if (paintInfo.mode != PaintMode.rect || paintInfo.offsets.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please draw a valid rectangular ROI.')),
+      );
+      return;
+    }
+
+    final int left = paintInfo.offsets[0]!.dx.toInt();
+    final int top = paintInfo.offsets[0]!.dy.toInt();
+    final int right = paintInfo.offsets[1]!.dx.toInt();
+    final int bottom = paintInfo.offsets[1]!.dy.toInt();
+
+    if (left >= right || top >= bottom) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid region dimensions. Please select properly.')),
+      );
+      return;
+    }
+
+    try {
+      final croppedImage = img.copyCrop(
+        decodedImage,
+        x: left,
+        y: top,
+        width: right - left,
+        height: bottom - top,
+      );
+
+      Uint8List croppedBytes = Uint8List.fromList(img.encodeJpg(croppedImage));
+
+      OCRService ocrService = OCRService();
+      String extractedText = await ocrService.extractText(croppedBytes);
+
+      if (extractedText.isEmpty) {
+        // ignore: use_build_context_synchronously
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No text found in the cropped region')),
+        );
+        return;
+      }
+
+      switch (field) {
+        case 'Name':
+          _nameController.text = extractedText;
+          break;
+        case 'Email':
+          _emailController.text = extractedText;
+          break;
+        case 'Age':
+          _ageController.text = extractedText;
+          break;
+        case 'Gender':
+          _genderController.text = extractedText;
+          break;
+        case 'Address':
+          _addressController.text = extractedText;
+          break;
+        case 'Phone Number':
+          _phoneController.text = extractedText;
+          break;
+        default:
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Invalid field selection')),
+          );
+          return;
+      }
+
+      log("Extracted Text: $extractedText");
+      // ignore: use_build_context_synchronously
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Extracted Text: $extractedText')),
+      );
+    } catch (e) {
+      log("Error during cropping/extraction: $e");
+      // ignore: use_build_context_synchronously
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to process the image. Try again.')),
+      );
+    }
   }
 
   @override
@@ -253,8 +304,4 @@ class ROISelectionScreenState extends State<ROISelectionScreen> {
       ],
     );
   }
-}
-
-extension on ImagePainterController {
-   get paintArea => null;
 }
