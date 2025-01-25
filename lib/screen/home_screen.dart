@@ -31,12 +31,24 @@ class ROISelectionScreen extends StatefulWidget {
 
 class ROISelectionScreenState extends State<ROISelectionScreen> {
   Uint8List? _imageBytes;
-  final ImagePainterController _controller = ImagePainterController(
-    fill: false,
-    color: Colors.black,
-    mode: PaintMode.rect,
-    strokeWidth: 2.0,
-  );
+  late final ImagePainterController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = ImagePainterController(
+      fill: false,
+      color: Colors.black,
+      mode: PaintMode.rect,
+      strokeWidth: 2.0,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.clear();  // Dispose of the controller when the widget is disposed
+    super.dispose();
+  }
 
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
