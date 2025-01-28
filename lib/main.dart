@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:text_extractor/Screen/home_screen.dart';
+import 'package:text_extractor/screens/home_screen.dart';
 
 void main() {
   runApp(const MyApp());
