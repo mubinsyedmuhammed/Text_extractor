@@ -1,4 +1,4 @@
-import 'package:text_extractor/screens/custom_app_bar.dart';
+import 'package:text_extractor/containers/custom_app_bar.dart';
 import 'package:text_extractor/containers/left_container.dart';
 import 'package:text_extractor/containers/right_container.dart';
 import 'package:flutter/material.dart';
