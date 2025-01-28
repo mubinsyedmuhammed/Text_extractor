@@ -28,6 +28,9 @@ class ROIForm extends StatelessWidget {
               field: entry.key,
               onExtract: onExtract,
             ),
+          SizedBox(
+            height: 20,
+          ),
           ElevatedButton(onPressed: onSubmit, child: const Text("Submit")),
         ],
       ),
