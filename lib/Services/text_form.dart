@@ -1,9 +1,9 @@
-import 'dart:developer';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:text_extractor/screens/roi_selection.dart'; // Ensure you have ROISelection imported
-import 'package:text_extractor/Services/api_fast.dart'; // API service to interact with backend
+import 'package:text_extractor/screens/roi_selection.dart';  
+import 'package:text_extractor/Services/api_fast.dart';  
+import 'package:text_extractor/Services/const.dart';
 
 class IconButtonForText extends StatelessWidget {
   const IconButtonForText({
@@ -32,7 +32,6 @@ class CustomForm extends StatefulWidget {
 }
 
 class _CustomFormState extends State<CustomForm> {
-  Uint8List? _selectedImageBytes;
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _pincodeController = TextEditingController();
@@ -48,30 +47,29 @@ class _CustomFormState extends State<CustomForm> {
 
   // Function to handle ROI selection and text extraction
   void _onROISelected(String field) {
-  // if (_selectedImageBytes == null || _selectedImageBytes!.isEmpty) {
-  //   ScaffoldMessenger.of(context).showSnackBar(
-  //     const SnackBar(content: Text('Please upload an Image first')),
-  //   );
-  //   return;
-  // }
+    if (selectedImageBytes == null || selectedImageBytes!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please upload an Image first')),
+      );
+      return;
+    }
 
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => ROISelection(
-        onROISelected: (croppedImage) {
-          _extractTextFromImage(croppedImage, field);
-        },
-        imageBytes: _selectedImageBytes!,
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ROISelection(
+          onROISelected: (croppedImage) {
+            _extractTextFromImage(croppedImage, field);
+          },
+          imageBytes: selectedImageBytes!,
+        ),
       ),
-    ),
-  );
-}
-
+    );
+  }
 
   // Extract text from cropped image and update the corresponding field
   Future<void> _extractTextFromImage(Uint8List croppedImage, String field) async {
-  ApiService apiService = ApiService();
+ OCRService apiService =OCRService();
   String? extractedText = await apiService.extractTextFromImage(croppedImage);
 
   if (extractedText != null && extractedText.isNotEmpty) {

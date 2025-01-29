@@ -1,29 +1,31 @@
-import 'dart:typed_data';
 import 'dart:convert';
-import 'dart:developer';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
-class ApiService {
-  static const String _apiUrl = "http://127.0.0.1:8000/extract_text/";
+class OCRService {
+  final String apiUrl = "http://127.0.0.1:8000/extract_text/";  // Fixed endpoint
 
-  // Send image to FastAPI backend to extract text
-  Future<String?> extractTextFromImage(Uint8List imageBytes) async {
+  Future<String> extractText(Uint8List imageBytes) async {
+    var request = http.MultipartRequest('POST', Uri.parse(apiUrl));
+
     try {
-      var request = http.MultipartRequest('POST', Uri.parse(_apiUrl))
-        ..files.add(http.MultipartFile.fromBytes('file', imageBytes, filename: 'image.jpg'));
+      // Add the image file to the request
+      request.files.add(http.MultipartFile.fromBytes('file', imageBytes, filename: 'image.jpg'));
 
+      // Send the request and await the response
       var response = await request.send();
 
       if (response.statusCode == 200) {
-        var responseData = await http.Response.fromStream(response);
-        var extractedText = jsonDecode(responseData.body)['extracted_text'];
+        final responseData = await response.stream.bytesToString();
+        final extractedText = json.decode(responseData)['extracted_cleaned_text'];
         return extractedText;
       } else {
-        return "Error: ${response.statusCode}";
+        return 'Failed to extract text';
       }
     } catch (e) {
-      log("Error sending request: $e");
-      return null;
+      return 'Error: $e';
     }
   }
+
+  extractTextFromImage(Uint8List croppedImage) {}
 }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:text_extractor/Services/api_fast.dart';
 import 'package:text_extractor/screens/roi_selection.dart';
+import 'package:text_extractor/Services/const.dart';
 
 class ImageUploader extends StatefulWidget {
   const ImageUploader({super.key});
@@ -14,9 +15,9 @@ class ImageUploader extends StatefulWidget {
 }
 
 class _ImageUploaderState extends State<ImageUploader> {
-  Uint8List? _selectedImageBytes;
+  // Uint8List? selectedImageBytes;
   bool _showROI = false;
-  String? _extractedText;
+  String? extractedText;
 
   // Image picker function
   Future<void> _pickImage() async {
@@ -26,9 +27,10 @@ class _ImageUploaderState extends State<ImageUploader> {
 
     if (result != null && result.files.single.bytes != null) {
       setState(() {
-        _selectedImageBytes = result.files.single.bytes;
+        selectedImageBytes = result.files.single.bytes;  // This now sets the global variable
       });
-    } else {
+    } 
+    else {
       // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No image selected or invalid file')),
@@ -38,8 +40,8 @@ class _ImageUploaderState extends State<ImageUploader> {
 
   void _clearImage() {
     setState(() {
-      _selectedImageBytes = null;
-      _extractedText = null;
+      selectedImageBytes = null;  // This now clears the global variable
+      extractedText = null;
     });
   }
 
@@ -51,11 +53,11 @@ class _ImageUploaderState extends State<ImageUploader> {
   }
 
   // Extract text using the backend
-  void _extractText(Uint8List imageBytes) async {
-  ApiService apiService = ApiService();
-  String? extractedText = await apiService.extractTextFromImage(imageBytes);
+  void _extractText(Uint8List selectedImageBytes) async {
+  OCRService apiService = OCRService();
+  String? extractedText = await apiService.extractTextFromImage(selectedImageBytes);
   setState(() {
-    _extractedText = extractedText ?? "Failed to extract text.";
+    extractedText = extractedText ?? "Failed to extract text.";
   });
 }
 
@@ -70,7 +72,7 @@ class _ImageUploaderState extends State<ImageUploader> {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
-      body: _selectedImageBytes == null
+      body: selectedImageBytes == null
           ? Center(
               child: ElevatedButton(
                 onPressed: _pickImage,
@@ -82,12 +84,12 @@ class _ImageUploaderState extends State<ImageUploader> {
                 Center(
                   child: _showROI
                       ? ROISelection(
-                          imageBytes: _selectedImageBytes!,
+                          imageBytes: selectedImageBytes!,
                           onROISelected: (croppedImage) {
                             _extractText(croppedImage);
                           },
                         )
-                      : Image.memory(_selectedImageBytes!),
+                      : Image.memory(selectedImageBytes!),
                 ),
                 Positioned(
                   top: 25,
@@ -103,7 +105,7 @@ class _ImageUploaderState extends State<ImageUploader> {
                     ),
                   ),
                 ),
-                if (_extractedText != null)
+                if (extractedText != null)
                   Positioned(
                     bottom: 25,
                     left: 15,
@@ -123,7 +125,7 @@ class _ImageUploaderState extends State<ImageUploader> {
                         ],
                       ),
                       child: Text(
-                        _extractedText!,
+                        extractedText!,
                         style: const TextStyle(fontSize: 16),
                       ),
                     ),
